@@ -9,8 +9,8 @@ const isValidEmail = (email: string): boolean => {
 const BACKEND_URL = 'http://localhost:3001/api/';
 
 function App(): JSX.Element {
-    const [emailQuery, setEmailQuery] = useState('demo@demo.com')
-    const [passwordQuery, setPasswordQuery] = useState('demo')
+    const [emailQuery, setEmailQuery] = useState('')
+    const [passwordQuery, setPasswordQuery] = useState('')
     const [errorMessage, setErrorMessage] = useState('')
     const [authToken, setAuthToken] = useState<string | null>(null)
 
