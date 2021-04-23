@@ -1,91 +1,85 @@
-import React, { useState } from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import './App.css';
+
+const isValidEmail = (email: string): boolean => {
+    const emailRegex = /^\S+@\S+\.\S+$/;
+    return emailRegex.test(email);
+}
+
+const BACKEND_URL = 'http://localhost:3001/api/';
 
 function App(): JSX.Element {
     const [emailQuery, setEmailQuery] = useState('')
     const [passwordQuery, setPasswordQuery] = useState('')
+    const [errorMessage, setErrorMessage] = useState('')
+    const [authToken, setAuthToken] = useState<string | null>(null)
 
-    let isShowError = false
-    let isAuthorized = false
-    let authStatus = 'is not authorized'
-    let errorMessage = ''
-    let authToken = null
-    let isSignOutButtonVisible = false
-    let isSignInButtonVisible = true
-    let isAuthStatusPositive = false
+    const onEmailChange = useCallback(async (e: React.FormEvent<HTMLInputElement>) => {
+        const email = e.currentTarget.value;
+        setEmailQuery(email);
 
-    const isValidEmail = (email: string): boolean => {
-        const emailRegex = /^\S+@\S+\.\S+$/;
-        return emailRegex.test(email);
-    }
-
-    const validateLoginForm = () => {
-        if (!emailQuery) {
-            isShowError = true;
-            errorMessage = 'Email cannot be empty';
-            return false;
-        }
-        if (errorMessage === 'Email cannot be empty') {
-            isShowError = false;
-            errorMessage = '';
-        }
-
-        if (!isValidEmail(emailQuery)) {
-            isShowError = true;
-            errorMessage = 'Email format is not valid';
-            return false;
-        }
-        if (errorMessage === 'Email format is not valid') {
-            isShowError = false;
-            errorMessage = '';
-        }
-
-        if (!passwordQuery) {
-            isShowError = true;
-            errorMessage = 'Password cannot be empty';
-            return false;
-        }
-        if (errorMessage === 'Password cannot be empty') {
-            isShowError = false;
-            errorMessage = '';
-        }
-
-        return true;
-    }
-
-    const validateCredentials = async (email: string, password: string): Promise<boolean> => new Promise((resolve) => {
-        if (email === 'demo@demo.com' && password === 'demo') {
-            setTimeout(() => {
-                resolve(true)
-            }, 1000)
-        } else {
-            setTimeout(() => {
-                resolve(false)
-            }, 1000)
-        }
-    })
-
-    const login = async (email: string, password: string, validationResult: boolean) => new Promise((resolve) => {
-        setTimeout(() => {
-            if (validationResult && email === 'demo@demo.com' && password === 'demo') {
-                resolve(true)
+        try {
+            const response = await fetch(`${BACKEND_URL}validate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({email})
+            });
+            const {status} = await response.json();
+            if (!status) {
+                setErrorMessage('Wrong email');
             }
-        })
-    })
-
-    const onAuthChanged = () => {
-        if (isAuthorized) {
-            isSignInButtonVisible = false;
-            isSignOutButtonVisible = true;
-            authStatus = 'authorized';
-            isAuthStatusPositive = true;
-        } else {
-            isSignInButtonVisible = true;
-            isSignOutButtonVisible = false;
-            authStatus = 'is not autorized';
-            isAuthStatusPositive = false;
+        } catch (e) {
+            setErrorMessage(e.message);
         }
-    }
+    }, []);
+
+    const onPassChange = useCallback((e: React.FormEvent<HTMLInputElement>): void => {
+        setPasswordQuery(e.currentTarget.value);
+    }, []);
+
+    const onSignIn = useCallback(async () => {
+        try {
+            const response = await fetch(`${BACKEND_URL}login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    email: emailQuery,
+                    password: passwordQuery,
+                })
+            });
+            const {status, token} = await response.json();
+            if (status) {
+                setErrorMessage('');
+                setAuthToken(token);
+            } else {
+                setErrorMessage('Wrong email or pass');
+            }
+
+        } catch (e) {
+            setErrorMessage(e.message);
+        }
+    }, [emailQuery, passwordQuery]);
+
+    const onSignOut = useCallback(() => {
+        setAuthToken(null);
+    }, []);
+
+    useEffect(() => {
+        if (!emailQuery) {
+            return setErrorMessage('Email cannot be empty');
+        }
+        if (!isValidEmail(emailQuery)) {
+            return setErrorMessage('Email format is not valid');
+        }
+        if (!passwordQuery) {
+            return setErrorMessage('Password cannot be empty');
+        }
+        setErrorMessage('');
+    }, [emailQuery, passwordQuery]);
 
     return (
         <div className="app-container d-flex container-fluid">
@@ -93,8 +87,8 @@ function App(): JSX.Element {
                 <div className="auth-container col bg-white border rounded-lg py-4 px-5">
                     <div className="row mt-2 mb-4">
                         Status:&nbsp;
-                        <span className={`${isAuthStatusPositive ? 'text-success' : 'text-danger'}`}>
-                          {authStatus}
+                        <span className={`${authToken ? 'text-success' : 'text-danger'}`}>
+                          {authToken ? 'authorized' : 'is not autorized'}
                         </span>
                     </div>
 
@@ -102,9 +96,7 @@ function App(): JSX.Element {
                         <input
                             type="text"
                             placeholder="user@email.com"
-                            onChange={(e: React.FormEvent<HTMLInputElement>): void => {
-                                setEmailQuery(e.currentTarget.value)
-                            }}
+                            onChange={onEmailChange}
                             value={emailQuery}
                             className="form-control"
                         />
@@ -113,62 +105,35 @@ function App(): JSX.Element {
                         <input
                             type="password"
                             placeholder="password"
-                            onChange={(e: React.FormEvent<HTMLInputElement>): void => {
-                                setPasswordQuery(e.currentTarget.value);
-                            }}
+                            onChange={onPassChange}
                             value={passwordQuery}
                             className="form-control"
                         />
                     </div>
 
-                    {isShowError && (
+                    {errorMessage && (
                         <div className="row my-3 text-danger justify-content-center">{errorMessage}</div>
                     )}
 
-                    {isSignInButtonVisible && (
+                    {!authToken && (
                         <div className="row mt-4">
                             <button
                                 type="button"
                                 className="col btn btn-primary"
-                                onClick={async () => {
-                                    if (!validateLoginForm()) {
-                                        return;
-                                    }
-
-                                    try {
-                                        const validationResult = await validateCredentials(emailQuery, passwordQuery);
-                                        const authorizationToken = await login(
-                                            emailQuery,
-                                            passwordQuery,
-                                            validationResult,
-                                        );
-
-                                        isAuthorized = true;
-                                        isShowError = false;
-                                        errorMessage = '';
-                                        authToken = authorizationToken;
-                                        onAuthChanged()
-                                    } catch (e) {
-                                        errorMessage = e.message;
-                                        isShowError = true;
-                                    }
-                                }}
+                                onClick={onSignIn}
+                                disabled={!!errorMessage}
                             >
                                 Sign in
                             </button>
                         </div>
                     )}
 
-                    {isSignOutButtonVisible && (
+                    {authToken && (
                         <div className="row mt-4">
                             <button
                                 type="button"
                                 className="col btn btn-primary"
-                                onClick={(): void => {
-                                    isAuthorized = false;
-                                    authToken = '';
-                                    onAuthChanged()
-                                }}
+                                onClick={onSignOut}
                             >
                                 Sign out
                             </button>
